@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: job_tracker
+    ports:
+      - "5434:5432"   # host 5434 to avoid clashing with other Postgres instances
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./server/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d job_tracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./server
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/job_tracker
+      JWT_SECRET: docker_dev_secret_change_me
+      PORT: 4000
+    volumes:
+      - uploads:/app/uploads   # persist uploaded resumes
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./client
+    ports:
+      - "8081:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  uploads:

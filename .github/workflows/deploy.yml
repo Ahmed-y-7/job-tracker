@@ -1,0 +1,42 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build & check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Backend — install
+        working-directory: ./server
+        run: npm install
+
+      - name: Frontend — install & build
+        working-directory: ./client
+        run: |
+          npm install
+          npm run build
+
+  deploy:
+    name: Deploy to EC2
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/job-tracker
+            git pull origin main
+            sudo docker compose -f docker-compose.prod.yml up -d --build
+            sudo docker image prune -f
